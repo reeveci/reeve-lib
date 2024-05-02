@@ -8,6 +8,7 @@ const DEFAULT_STAGE = "default"
 
 type PipelineDefinition struct {
 	Name        string               `json:"name" yaml:"name"`
+	Headline    string               `json:"headline" yaml:"headline"`
 	Description string               `json:"description" yaml:"description"`
 	When        map[string]Condition `json:"when" yaml:"when"`
 	Steps       []Step               `json:"steps" yaml:"steps"`
