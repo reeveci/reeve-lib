@@ -29,11 +29,12 @@ func Serve(config *PluginConfig) {
 
 func RegisterSharedTypes() {
 	// params
+	gob.Register(schema.LiteralCommand(nil))
 	gob.Register(schema.LiteralParam(""))
 	gob.Register(schema.EnvParam{})
 	gob.Register(schema.VarParam{})
-	gob.Register(map[string]interface{}{})
-	gob.Register([]interface{}{})
+	gob.Register(map[string]any{})
+	gob.Register([]any{})
 
 	// plugin arguments
 	gob.Register(map[string]string{})

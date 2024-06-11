@@ -47,7 +47,7 @@ type Step struct {
 	IgnoreFailure bool                 `json:"ignoreFailure" yaml:"ignoreFailure"`
 }
 
-type RawParam interface{}
+type RawParam any
 type LiteralParam string
 type EnvParam struct {
 	Env     string   `json:"env" yaml:"env"`
@@ -57,5 +57,8 @@ type VarParam struct {
 	Var     string   `json:"var" yaml:"var"`
 	Replace []string `json:"replace" yaml:"replace"`
 }
+
+type RawCommand any
+type LiteralCommand []string
 
 type Fact []string

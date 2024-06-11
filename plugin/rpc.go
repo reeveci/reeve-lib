@@ -14,7 +14,7 @@ type ReevePluginClient struct {
 }
 
 func (r *ReevePluginClient) Name() (resp string, err error) {
-	err = r.client.Call("Plugin.Name", new(interface{}), &resp)
+	err = r.client.Call("Plugin.Name", new(any), &resp)
 	return
 }
 
@@ -27,16 +27,16 @@ func (r *ReevePluginClient) Register(settings map[string]string, api ReeveAPI) (
 		api.Close()
 	}()
 
-	err = r.client.Call("Plugin.Register", []interface{}{settings, brokerID}, &resp)
+	err = r.client.Call("Plugin.Register", []any{settings, brokerID}, &resp)
 	return
 }
 
 func (r *ReevePluginClient) Unregister() error {
-	return r.client.Call("Plugin.Unregister", new(interface{}), new(interface{}))
+	return r.client.Call("Plugin.Unregister", new(any), new(any))
 }
 
 func (r *ReevePluginClient) Message(source string, message schema.Message) error {
-	return r.client.Call("Plugin.Message", schema.FullMessage{Message: message, Source: source}, new(interface{}))
+	return r.client.Call("Plugin.Message", schema.FullMessage{Message: message, Source: source}, new(any))
 }
 
 func (r *ReevePluginClient) Discover(trigger schema.Trigger) (resp []schema.Pipeline, err error) {
@@ -51,7 +51,7 @@ func (r *ReevePluginClient) Resolve(env []string) (resp map[string]schema.Env, e
 
 func (r *ReevePluginClient) Notify(status schema.PipelineStatus) error {
 	if status.Logs == nil || !status.Logs.Available() {
-		return r.client.Call("Plugin.Notify", []interface{}{status}, new(interface{}))
+		return r.client.Call("Plugin.Notify", []any{status}, new(any))
 	}
 
 	logReaderProviderServer := &LogReaderProviderServer{impl: status.Logs, broker: r.broker}
@@ -60,7 +60,7 @@ func (r *ReevePluginClient) Notify(status schema.PipelineStatus) error {
 	brokerID := r.broker.NextId()
 	go r.broker.AcceptAndServe(brokerID, logReaderProviderServer)
 
-	return r.client.Call("Plugin.Notify", []interface{}{status, brokerID}, new(interface{}))
+	return r.client.Call("Plugin.Notify", []any{status, brokerID}, new(any))
 }
 
 func (r *ReevePluginClient) CLIMethod(method string, args []string) (resp string, err error) {
@@ -77,12 +77,12 @@ type ReevePluginServer struct {
 	broker *goplugin.MuxBroker
 }
 
-func (r *ReevePluginServer) Name(args *interface{}, resp *string) (err error) {
+func (r *ReevePluginServer) Name(args *any, resp *string) (err error) {
 	*resp, err = r.impl.Name()
 	return
 }
 
-func (r *ReevePluginServer) Register(args []interface{}, resp *Capabilities) error {
+func (r *ReevePluginServer) Register(args []any, resp *Capabilities) error {
 	conn, err := r.broker.Dial(args[1].(uint32))
 	if err != nil {
 		return err
@@ -94,11 +94,11 @@ func (r *ReevePluginServer) Register(args []interface{}, resp *Capabilities) err
 	return err
 }
 
-func (r *ReevePluginServer) Unregister(args *interface{}, resp *interface{}) error {
+func (r *ReevePluginServer) Unregister(args *any, resp *any) error {
 	return r.impl.Unregister()
 }
 
-func (r *ReevePluginServer) Message(args schema.FullMessage, resp *interface{}) error {
+func (r *ReevePluginServer) Message(args schema.FullMessage, resp *any) error {
 	return r.impl.Message(args.Source, args.Message)
 }
 
@@ -112,7 +112,7 @@ func (r *ReevePluginServer) Resolve(args []string, resp *map[string]schema.Env) 
 	return
 }
 
-func (r *ReevePluginServer) Notify(args []interface{}, resp *interface{}) error {
+func (r *ReevePluginServer) Notify(args []any, resp *any) error {
 	status := args[0].(schema.PipelineStatus)
 
 	if len(args) == 1 {
@@ -138,11 +138,11 @@ type ReeveAPIClient struct {
 }
 
 func (t *ReeveAPIClient) NotifyMessages(messages []schema.Message) error {
-	return t.client.Call("Plugin.NotifyMessages", messages, new(interface{}))
+	return t.client.Call("Plugin.NotifyMessages", messages, new(any))
 }
 
 func (t *ReeveAPIClient) NotifyTriggers(triggers []schema.Trigger) error {
-	return t.client.Call("Plugin.NotifyTriggers", triggers, new(interface{}))
+	return t.client.Call("Plugin.NotifyTriggers", triggers, new(any))
 }
 
 func (t *ReeveAPIClient) Close() error {
@@ -153,15 +153,15 @@ type ReeveAPIServer struct {
 	impl ReeveAPI
 }
 
-func (t *ReeveAPIServer) NotifyMessages(args []schema.Message, resp *interface{}) error {
+func (t *ReeveAPIServer) NotifyMessages(args []schema.Message, resp *any) error {
 	return t.impl.NotifyMessages(args)
 }
 
-func (t *ReeveAPIServer) NotifyTriggers(args []schema.Trigger, resp *interface{}) error {
+func (t *ReeveAPIServer) NotifyTriggers(args []schema.Trigger, resp *any) error {
 	return t.impl.NotifyTriggers(args)
 }
 
-func (t *ReeveAPIServer) Close(args *interface{}, resp *interface{}) error {
+func (t *ReeveAPIServer) Close(args *any, resp *any) error {
 	return nil
 }
 
@@ -181,7 +181,7 @@ func (l *LogReaderProviderClient) Reader() (schema.LogReader, error) {
 	}
 
 	var id uint32
-	err := l.client.Call("Plugin.Reader", new(interface{}), &id)
+	err := l.client.Call("Plugin.Reader", new(any), &id)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +216,7 @@ type LogReaderProviderServer struct {
 	broker *goplugin.MuxBroker
 }
 
-func (l *LogReaderProviderServer) Reader(args *interface{}, resp *uint32) error {
+func (l *LogReaderProviderServer) Reader(args *any, resp *uint32) error {
 	reader, err := l.impl.Reader()
 	if err != nil {
 		return err
@@ -234,7 +234,7 @@ func (l *LogReaderProviderServer) Reader(args *interface{}, resp *uint32) error 
 	return nil
 }
 
-func (l *LogReaderProviderServer) Close(args *interface{}, resp *interface{}) error {
+func (l *LogReaderProviderServer) Close(args *any, resp *any) error {
 	return nil
 }
 
@@ -259,7 +259,7 @@ func (l *LogReaderClient) Read(p []byte) (n int, err error) {
 }
 
 func (l *LogReaderClient) Seek(offset int64, whence int) (n int64, err error) {
-	err = l.client.Call("Plugin.Seek", []interface{}{offset, whence}, &n)
+	err = l.client.Call("Plugin.Seek", []any{offset, whence}, &n)
 	return
 }
 
@@ -280,8 +280,8 @@ func (l *LogReaderClient) ReadAt(p []byte, offset int64) (n int, err error) {
 }
 
 func (l *LogReaderClient) Size() (size int64, isClosed bool) {
-	var resp []interface{}
-	err := l.client.Call("Plugin.Size", new(interface{}), &resp)
+	var resp []any
+	err := l.client.Call("Plugin.Size", new(any), &resp)
 	if err != nil {
 		size = -1
 		isClosed = true
@@ -307,7 +307,7 @@ func (l *LogReaderServer) Read(args int, resp *[]byte) error {
 	return err
 }
 
-func (l *LogReaderServer) Seek(args []interface{}, resp *int64) (err error) {
+func (l *LogReaderServer) Seek(args []any, resp *int64) (err error) {
 	*resp, err = l.impl.Seek(args[0].(int64), args[1].(int))
 	return
 }
@@ -319,13 +319,13 @@ func (l *LogReaderServer) ReadAt(args []int64, resp *[]byte) error {
 	return err
 }
 
-func (l *LogReaderServer) Size(args *interface{}, resp *[]interface{}) (err error) {
+func (l *LogReaderServer) Size(args *any, resp *[]any) (err error) {
 	size, isClosed := l.impl.Size()
-	*resp = []interface{}{size, isClosed}
+	*resp = []any{size, isClosed}
 	return nil
 }
 
-func (l *LogReaderServer) Close(args *interface{}, resp *interface{}) error {
+func (l *LogReaderServer) Close(args *any, resp *any) error {
 	return nil
 }
 
@@ -333,12 +333,12 @@ type ReevePlugin struct {
 	Impl Plugin
 }
 
-func (p *ReevePlugin) Server(b *goplugin.MuxBroker) (interface{}, error) {
+func (p *ReevePlugin) Server(b *goplugin.MuxBroker) (any, error) {
 	return &ReevePluginServer{impl: p.Impl, broker: b}, nil
 }
 
 var _ Plugin = (*ReevePluginClient)(nil)
 
-func (ReevePlugin) Client(b *goplugin.MuxBroker, c *rpc.Client) (interface{}, error) {
+func (ReevePlugin) Client(b *goplugin.MuxBroker, c *rpc.Client) (any, error) {
 	return &ReevePluginClient{client: c, broker: b}, nil
 }

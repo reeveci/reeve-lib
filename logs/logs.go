@@ -29,9 +29,9 @@ type LogWriter interface {
 }
 
 type Printer interface {
-	Print(a ...interface{}) (int, error)
-	Printf(format string, a ...interface{}) (int, error)
-	Println(values ...interface{}) (int, error)
+	Print(a ...any) (int, error)
+	Printf(format string, a ...any) (int, error)
+	Println(values ...any) (int, error)
 }
 
 type ScopeWriter interface {

@@ -3,12 +3,13 @@ package schema
 import (
 	"fmt"
 
+	"github.com/google/shlex"
 	"github.com/reeveci/reeve-lib/replacements"
 )
 
 type RunConfig struct {
 	Task      string              `json:"task" yaml:"task"`
-	Command   []string            `json:"command" yaml:"command"`
+	Command   RawCommand          `json:"command" yaml:"command"`
 	Input     RawParam            `json:"input" yaml:"input"`
 	Directory RawParam            `json:"directory" yaml:"directory"`
 	User      RawParam            `json:"user" yaml:"user"`
@@ -16,8 +17,11 @@ type RunConfig struct {
 }
 
 func (config RunConfig) GetEnv() []string {
-	keys := make([]string, 0, 1+len(config.Params))
+	keys := make([]string, 0, 4+len(config.Params))
 
+	if key, ok := getEnv(config.Command); ok {
+		keys = append(keys, key)
+	}
 	if key, ok := getEnv(config.Input); ok {
 		keys = append(keys, key)
 	}
@@ -38,7 +42,7 @@ func (config RunConfig) GetEnv() []string {
 
 func getEnv(param RawParam) (string, bool) {
 	switch value := param.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		if envKey, ok := value["env"].(string); ok && envKey != "" {
 			return envKey, true
 		}
@@ -56,6 +60,7 @@ func (config RunConfig) Resolve(env map[string]Env, vars map[string]Var) (result
 }
 
 type ResolvedRunConfig struct {
+	Command   []string
 	Input     string
 	Directory string
 	User      string
@@ -70,11 +75,15 @@ type resolver struct {
 }
 
 func (r *resolver) Resolve(config RunConfig) (result ResolvedRunConfig, unresolvedEnv, unresolvedVars []string, err error) {
-	r.unresolvedEnv = make([]string, 0, 1+len(config.Params))
-	r.unresolvedVars = make([]string, 0, 1+len(config.Params))
+	r.unresolvedEnv = make([]string, 0, 4+len(config.Params))
+	r.unresolvedVars = make([]string, 0, 4+len(config.Params))
 
 	result.Params = make(map[string]string, len(config.Params))
 
+	if result.Command, _, err = r.resolveCommand(config.Command); err != nil {
+		err = fmt.Errorf("invalid command - %s", err)
+		return
+	}
 	if result.Input, _, err = r.resolve(config.Input); err != nil {
 		err = fmt.Errorf("invalid input - %s", err)
 		return
@@ -109,6 +118,36 @@ func (r *resolver) Resolve(config RunConfig) (result ResolvedRunConfig, unresolv
 	return result, r.unresolvedEnv, r.unresolvedVars, nil
 }
 
+func (r *resolver) resolveCommand(command RawCommand) (result []string, found bool, err error) {
+	switch value := command.(type) {
+	case []string:
+		return value, true, nil
+
+	case LiteralCommand:
+		return value, true, nil
+
+	case []any:
+		args := make([]string, len(value))
+		for i, rawArg := range value {
+			var ok bool
+			args[i], ok = rawArg.(string)
+			if !ok {
+				err = fmt.Errorf("command may only contain strings but contains %T (%v)", rawArg, rawArg)
+				return
+			}
+		}
+		return args, true, nil
+
+	default:
+		var resolvedCommand string
+		if resolvedCommand, found, err = r.resolve(command); !found || err != nil {
+			return
+		}
+		result, err = shlex.Split(resolvedCommand)
+		return
+	}
+}
+
 func (r *resolver) resolve(param RawParam) (result string, found bool, err error) {
 	switch value := param.(type) {
 	case nil:
@@ -120,7 +159,7 @@ func (r *resolver) resolve(param RawParam) (result string, found bool, err error
 	case LiteralParam:
 		return string(value), true, nil
 
-	case map[string]interface{}:
+	case map[string]any:
 		if rawEnv := value["env"]; rawEnv != nil {
 			envKey, ok := rawEnv.(string)
 			if !ok {
@@ -133,7 +172,7 @@ func (r *resolver) resolve(param RawParam) (result string, found bool, err error
 				r.unresolvedEnv = append(r.unresolvedEnv, envKey)
 				return
 			}
-			rawExpressions, _ := value["replace"].([]interface{})
+			rawExpressions, _ := value["replace"].([]any)
 			expressions := make([]string, len(rawExpressions))
 			for i, rawReplace := range rawExpressions {
 				expressions[i], ok = rawReplace.(string)
@@ -158,7 +197,7 @@ func (r *resolver) resolve(param RawParam) (result string, found bool, err error
 				r.unresolvedVars = append(r.unresolvedVars, varKey)
 				return
 			}
-			rawExpressions, _ := value["replace"].([]interface{})
+			rawExpressions, _ := value["replace"].([]any)
 			expressions := make([]string, len(rawExpressions))
 			for i, rawReplace := range rawExpressions {
 				expressions[i], ok = rawReplace.(string)
