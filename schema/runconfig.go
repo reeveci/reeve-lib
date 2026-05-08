@@ -8,9 +8,11 @@ import (
 )
 
 type RunConfig struct {
-	Task      string              `json:"task" yaml:"task"`
-	Command   RawCommand          `json:"command" yaml:"command"`
-	Input     RawParam            `json:"input" yaml:"input"`
+	Task    string     `json:"task" yaml:"task"`
+	Command RawCommand `json:"command" yaml:"command"`
+	Input   RawParam   `json:"input" yaml:"input"`
+	Mounts  []RawParam `json:"mounts" yaml:"mounts"`
+	// Deprecated: Use Mounts instead
 	Directory RawParam            `json:"directory" yaml:"directory"`
 	User      RawParam            `json:"user" yaml:"user"`
 	Params    map[string]RawParam `json:"params" yaml:"params"`
@@ -24,6 +26,11 @@ func (config RunConfig) GetEnv() []string {
 	}
 	if key, ok := getEnv(config.Input); ok {
 		keys = append(keys, key)
+	}
+	for _, v := range config.Mounts {
+		if key, ok := getEnv(v); ok {
+			keys = append(keys, key)
+		}
 	}
 	if key, ok := getEnv(config.Directory); ok {
 		keys = append(keys, key)
@@ -60,8 +67,10 @@ func (config RunConfig) Resolve(env map[string]Env, vars map[string]Var) (result
 }
 
 type ResolvedRunConfig struct {
-	Command   []string
-	Input     string
+	Command []string
+	Input   string
+	Mounts  []string
+	// Deprecated: Use Mounts instead
 	Directory string
 	User      string
 	Params    map[string]string
@@ -78,6 +87,7 @@ func (r *resolver) Resolve(config RunConfig) (result ResolvedRunConfig, unresolv
 	r.unresolvedEnv = make([]string, 0, 4+len(config.Params))
 	r.unresolvedVars = make([]string, 0, 4+len(config.Params))
 
+	result.Mounts = make([]string, 0, len(config.Mounts))
 	result.Params = make(map[string]string, len(config.Params))
 
 	if result.Command, _, err = r.resolveCommand(config.Command); err != nil {
@@ -88,6 +98,21 @@ func (r *resolver) Resolve(config RunConfig) (result ResolvedRunConfig, unresolv
 		err = fmt.Errorf("invalid input - %s", err)
 		return
 	}
+
+	for i, v := range config.Mounts {
+		var value string
+		var found bool
+		value, found, err = r.resolve(v)
+		if err != nil {
+			err = fmt.Errorf("invalid mount at index %v - %s", i, err)
+			return
+		}
+		if !found {
+			continue
+		}
+		result.Mounts = append(result.Mounts, value)
+	}
+
 	if result.Directory, _, err = r.resolve(config.Directory); err != nil {
 		err = fmt.Errorf("invalid directory - %s", err)
 		return
